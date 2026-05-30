@@ -84,7 +84,7 @@ def main():
 
     output_dir = "docs"
     os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, "valencia_map.html")
+    output_file = os.path.join(output_dir, "index.html")
 
     mapa.save(output_file)
     print(f"Mapa guardado en {output_file}")
