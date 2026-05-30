@@ -1,11 +1,11 @@
 .venv/
+.vscode/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env
 .DS_Store
-output/
+data/
 *.sqlite3
 .idea/
-.vscode/*.code-workspace
