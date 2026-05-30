@@ -82,7 +82,7 @@ def main():
 
 
 
-    output_dir = "output"
+    output_dir = "docs"
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, "valencia_map.html")
 
