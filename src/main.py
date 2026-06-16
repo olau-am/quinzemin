@@ -5,23 +5,6 @@ import webbrowser
 import geopandas as gpd
 
 
-def get_color_by_population(population):
-    """
-    Retorna un color basado en el valor de población.
-    """
-    pop = int(population)
-    if pop < 10:
-        return "#ffffcc"  # Amarillo claro
-    elif pop < 50:
-        return "#c7e9b4"  # Verde claro
-    elif pop < 100:
-        return "#7fbc41"  # Verde medio
-    elif pop < 200:
-        return "#2b8cbe"  # Azul medio
-    else:
-        return "#08589e"  # Azul oscuro
-
-
 def main():
     # Coordenadas aproximadas del centro de Valencia
     valencia_lat = 39.4699
@@ -35,26 +18,24 @@ def main():
         icon=folium.Icon(color="blue", icon="info-sign")
     ).add_to(mapa)
 
-    # Cargar y mostrar zonas censales con código de colores por población
-    population_path = "data/population_valencia.json"
-    if os.path.exists(population_path):
-        with open(population_path, "r") as f:
-            population_data = json.load(f)
-        
-        # Añadir GeoJSON de zonas censales al mapa
+    # Cargar y mostrar secciones censales
+    secciones_path = "data/secciones_censales.json"
+    if os.path.exists(secciones_path):
+        with open(secciones_path, "r") as f:
+            secciones_data = json.load(f)
+
         folium.GeoJson(
-            population_data,
-            style_function=lambda feature: {
-                "fillColor": get_color_by_population(feature["properties"]["population"]),
+            secciones_data,
+            style_function=lambda _: {
+                "fillColor": "#ffffcc",
                 "color": "black",
                 "weight": 1,
                 "opacity": 0.7,
-                "fillOpacity": 0.6
-            },
-            tooltip=folium.GeoJsonTooltip(fields=["population"], labels=True)
+                "fillOpacity": 0.3
+            }
         ).add_to(mapa)
-        
-        print(f"Zonas censales cargadas: {len(population_data.get('features', []))}")
+
+        print(f"Secciones censales cargadas: {len(secciones_data.get('features', []))}")
 
     # Cargar centros de salud desde GeoJSON
     geojson_path = "data/ca_centros_salud.geojson"

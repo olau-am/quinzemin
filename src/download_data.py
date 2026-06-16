@@ -1,47 +1,34 @@
+import os
 import requests
 
-# IDs de archivos en Google Drive
-file_ids = {
-    "valenbisi-disponibilitat.geojson": "1_R3X0dpPILKoI911CqU1LjMxmN8uAfmv",
-    "population_valencia.json": "1GYqiuLm5_5h1ueZJRS6djmzVs210DQob",
-    "traffic_valencia.json": "1s5k0WfoBP4sXmcA8CknulKtAg92Y8Gyi",
-    "tweets_valencia.geojson": "1sfbK_RysOkjQOWo4h0xy3CFpY6coVvGK",
-    "ca_centros_salud.geojson": "1InHMwWx8MFMDWZrFigxmnZCc-bVHtAgj",
-    "ca_hospitales.geojson": "1vCD7t2RtNCyun628GTxR_Yc2e52mmInr",
-    "centros_educativos.geojson": "1y269pRUirxTVPhJo7kzM2LPZOs5V3gD4",
-    "metro.geojson": "1FNSwMSADpNH0xicgvoCJMwY-M7H6j1R5"
+# Fuentes de datos abiertos (datos.gob.es y portales municipales/autonómicos)
+data_sources = {
+    "secciones_censales.json": "https://geoportal.valencia.es/apps/OpenData/UrbanismoEInfraestructuras/SecCensales.json",
+    "traffic_valencia.json": "https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/188/query?where=1=1&outFields=*&f=geojson",
+    "ca_centros_salud.geojson": "https://terramapas.icv.gva.es/15_SistemaValencianoSalud?request=GetFeature&service=WFS&version=2.0.0&typename=CentrosSanitarios.CentrosSalud&outputformat=geojson",
+    "ca_hospitales.geojson": "https://terramapas.icv.gva.es/15_SistemaValencianoSalud?request=GetFeature&service=WFS&version=2.0.0&typename=CentrosSanitarios.Hospitales&outputformat=geojson",
+    "centros_educativos.geojson": "https://opendata.vlci.valencia.es/dataset/11436f0c-082b-4e5b-9659-005f5b528bde/resource/938e34b7-bb7d-4b0c-8176-3602d47ebd6a/download/centros-educativos-en-valencia.geojson",
+    "metro.geojson": "https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/221/query?where=1=1&outFields=*&f=geojson",
+    "valenbisi-disponibilitat.geojson": "https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/228/query?where=1=1&outFields=*&f=geojson",
+    # tweets_valencia.geojson eliminado: los datos de Twitter/X no son datos abiertos gubernamentales
 }
 
 
-def descargar_archivo_drive(file_id, destination):
-    """
-    Descarga un archivo de Google Drive usando su ID y lo guarda en una ubicación local.
-
-    Parameters:
-    - file_id: ID del archivo en Google Drive
-    - destination: Ruta donde se guardará el archivo
-    """
-    url = f"https://drive.google.com/uc?id={file_id}"
-    response = requests.get(url, stream=True)
+def descargar_archivo(url, destination):
+    response = requests.get(url, stream=True, timeout=60)
+    response.raise_for_status()
     with open(destination, "wb") as f:
         f.write(response.content)
     print(f"✓ Descargado: {destination}")
 
 
 def descargar_todos_los_archivos(output_dir="data"):
-    """
-    Descarga todos los archivos de Google Drive al directorio especificado.
-
-    Parameters:
-    - output_dir: Directorio donde se guardarán los archivos (default: 'data')
-    """
-    import os
     os.makedirs(output_dir, exist_ok=True)
 
-    for file_name, file_id in file_ids.items():
+    for file_name, url in data_sources.items():
         destination = os.path.join(output_dir, file_name)
         try:
-            descargar_archivo_drive(file_id, destination)
+            descargar_archivo(url, destination)
         except Exception as e:
             print(f"✗ Error descargando {file_name}: {e}")
 
