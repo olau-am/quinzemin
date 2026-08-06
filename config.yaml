@@ -1,0 +1,63 @@
+city:
+  name: "Valencia"
+  center: [39.4699, -0.3763]   # [lat, lon] del centro del mapa
+  zoom: 12
+  bbox: "39.38,-0.45,39.55,-0.29"  # (S,W,N,E) para queries Overpass
+
+  # Capa de áreas de análisis (secciones censales u otra división territorial)
+  areas:
+    url: "https://geoportal.valencia.es/server/rest/services/OPENDATA/UrbanismoEInfraestructuras/MapServer/210/query?where=1=1&outFields=*&f=geojson"
+    id_field: "coddistsecc"   # campo que identifica cada área en el tooltip
+
+analysis:
+  distance_m: 1000   # radio de accesibilidad en metros
+
+map:
+  emoji_min_zoom: 14  # zoom mínimo a partir del cual aparecen los emojis
+
+# Lista de servicios a analizar.
+# Tipos disponibles:
+#   url     → descarga directa de un GeoJSON desde una URL
+#   overpass → consulta a la API de OpenStreetMap (Overpass); usa {bbox} como placeholder
+#
+# Campos opcionales:
+#   filter.field    → nombre del campo sobre el que filtrar
+#   filter.contains → subcadena que debe contener el campo (búsqueda sin distinción de mayúsculas)
+
+services:
+  - id: salud
+    label: "Centros de Salud"
+    emoji: "🏥"
+    url: "https://terramapas.icv.gva.es/15_SistemaValencianoSalud?request=GetFeature&service=WFS&version=2.0.0&typename=CentrosSanitarios.CentrosSalud&outputformat=geojson"
+    name_field: "cen_desclar"
+
+  - id: primaria
+    label: "Ed. Primaria"
+    emoji: "🏫"
+    url: "https://opendata.vlci.valencia.es/dataset/11436f0c-082b-4e5b-9659-005f5b528bde/resource/938e34b7-bb7d-4b0c-8176-3602d47ebd6a/download/centros-educativos-en-valencia.geojson"
+    name_field: "dlibre"
+    filter:
+      field: "dgenerica"
+      contains: "PRIMÀR"
+
+  - id: secundaria
+    label: "Ed. Secundaria"
+    emoji: "📚"
+    url: "https://opendata.vlci.valencia.es/dataset/11436f0c-082b-4e5b-9659-005f5b528bde/resource/938e34b7-bb7d-4b0c-8176-3602d47ebd6a/download/centros-educativos-en-valencia.geojson"
+    name_field: "dlibre"
+    filter:
+      field: "dgenerica"
+      contains: "SECUNDÀR"
+
+  - id: transporte
+    label: "Transporte Público"
+    emoji: "🚌"
+    url: "https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/221/query?where=1=1&outFields=*&f=geojson"
+    name_field: "nombre"
+
+  - id: supermercados
+    label: "Supermercados"
+    emoji: "🛒"
+    type: overpass
+    overpass_query: '(nwr["shop"="supermarket"]({bbox});); out center;'
+    name_field: "name"
