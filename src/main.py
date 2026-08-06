@@ -171,44 +171,56 @@ def main() -> None:
     svcs_with_emoji = [s for s in services if s.get("emoji")]
 
     if svcs_with_emoji:
-        emoji_fg = folium.FeatureGroup(name="Servicios faltantes", show=False)
+        # show=True: la capa se añade al mapa; el JS la oculta si zoom < min_zoom
+        emoji_fg = folium.FeatureGroup(name="Servicios faltantes", show=True)
+        ok_cols  = {s["id"]: f"{s['id']}_ok" for s in svcs_with_emoji}
+        n_emoji  = 0
 
         for idx, row in areas_wgs84.iterrows():
-            missing = [s["emoji"] for s in svcs_with_emoji
-                       if not row.get(f"{s['id']}_ok", True)]
+            missing = []
+            for s in svcs_with_emoji:
+                col = ok_cols[s["id"]]
+                if col in areas_wgs84.columns and not bool(row[col]):
+                    missing.append(s["emoji"])
             if not missing:
                 continue
-            c = centroids_wgs84[idx]
-            n = len(missing)
+
+            c    = centroids_wgs84[idx]
+            n    = len(missing)
+            text = "".join(missing)
             folium.Marker(
                 location=[c.y, c.x],
                 icon=folium.DivIcon(
                     html=(
                         f'<div style="font-size:18px;line-height:1;white-space:nowrap;'
-                        f'filter:drop-shadow(0 0 3px rgba(255,255,255,0.9))">'
-                        f'{"".join(missing)}</div>'
+                        f'filter:drop-shadow(0 0 3px rgba(255,255,255,0.9))">{text}</div>'
                     ),
                     icon_size=(n * 22, 22),
                     icon_anchor=(n * 11, 11),
+                    class_name="",   # elimina el wrapper extra de Folium
                 ),
             ).add_to(emoji_fg)
+            n_emoji += 1
 
         emoji_fg.add_to(mapa)
+        print(f"Emoji markers: {n_emoji} áreas con servicios faltantes")
 
         map_var = mapa.get_name()
         fg_var  = emoji_fg.get_name()
+        # Llamada directa (no whenReady): el script se ejecuta después de que
+        # el mapa ya está inicializado, por lo que getZoom() es válido de inmediato.
         mapa.get_root().html.add_child(Element(
-            f'<script>'
-            f'(function(){{'
-            f'  var _mz={emoji_min_zoom};'
-            f'  function _upd(){{'
-            f'    if({map_var}.getZoom()>=_mz){{if(!{map_var}.hasLayer({fg_var})){{{map_var}.addLayer({fg_var});}}}}'
-            f'    else{{if({map_var}.hasLayer({fg_var})){{{map_var}.removeLayer({fg_var});}}}}'
-            f'  }}'
-            f'  {map_var}.on("zoomend",_upd);'
-            f'  {map_var}.whenReady(_upd);'
-            f'}})();'
-            f'</script>'
+            "<script>"
+            "(function(){"
+            f"var _m={map_var},_fg={fg_var},_mz={emoji_min_zoom};"
+            "function _upd(){"
+            "if(_m.getZoom()>=_mz){if(!_m.hasLayer(_fg))_m.addLayer(_fg);}"
+            "else{if(_m.hasLayer(_fg))_m.removeLayer(_fg);}"
+            "}"
+            "_m.on('zoomend',_upd);"
+            "_upd();"
+            "})();"
+            "</script>"
         ))
 
     output_dir  = "docs"
