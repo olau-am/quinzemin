@@ -61,3 +61,17 @@ services:
     type: overpass
     overpass_query: '(nwr["shop"="supermarket"]({bbox});); out center;'
     name_field: "name"
+
+  - id: zonas_verdes
+    label: "Zonas Verdes"
+    emoji: "🌳"
+    url: "https://geoportal.valencia.es/server/rest/services/OPENDATA/MedioAmbiente/MapServer/8/query?where=1=1&outFields=*&f=geojson"
+    name_field: "nombre"
+
+  - id: cultura
+    label: "Cultura"
+    emoji: "🎭"
+    type: overpass
+    # Incluye: bibliotecas, teatros, cines y centros culturales/artes
+    overpass_query: '(nwr["amenity"="library"]({bbox});nwr["amenity"="theatre"]({bbox});nwr["amenity"="cinema"]({bbox});nwr["amenity"="arts_centre"]({bbox});); out center;'
+    name_field: "name"
