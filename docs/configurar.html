@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurador — Ciudad de los 15 Minutos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  background: #f1f5f9;
+  color: #1e293b;
+  min-height: 100vh;
+}
+
+header {
+  background: #1e40af;
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+header h1 { font-size: 20px; font-weight: 700; }
+header p  { font-size: 13px; opacity: .8; margin-top: 2px; }
+header a  { color: white; opacity: .7; font-size: 13px; margin-left: auto; text-decoration: none; }
+header a:hover { opacity: 1; }
+
+main {
+  max-width: 820px;
+  margin: 28px auto;
+  padding: 0 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.card-header .step {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #1e40af;
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.card-header h2 { font-size: 15px; font-weight: 600; }
+.card-body { padding: 18px; }
+
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 5px;
+}
+.field small {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+input[type="text"], input[type="number"], input[type="url"], textarea, select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1e293b;
+  background: white;
+  transition: border-color .15s;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+textarea { resize: vertical; min-height: 70px; font-family: 'Menlo', 'Consolas', monospace; font-size: 12px; }
+select { cursor: pointer; }
+
+.row { display: flex; gap: 12px; }
+.row .field { flex: 1; }
+.row .field-xs { flex: 0 0 90px; }
+.row .field-sm { flex: 0 0 130px; }
+
+/* Autocomplete */
+.autocomplete-wrap { position: relative; }
+.suggestions {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 2px);
+  left: 0; right: 0;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  overflow: hidden;
+  display: none;
+}
+.suggestions.open { display: block; }
+.suggestion-item {
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background: #eff6ff; }
+
+/* Divider */
+hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
+
+/* Service cards */
+.service-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.service-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: pointer;
+  user-select: none;
+}
+.service-emoji-input {
+  width: 44px !important;
+  font-size: 18px !important;
+  text-align: center;
+  padding: 4px 6px !important;
+  flex-shrink: 0;
+}
+.service-label-input {
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px !important;
+}
+.btn-remove {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.btn-remove:hover { background: #fee2e2; color: #ef4444; }
+
+.service-card-body { padding: 14px; }
+
+.type-fields { margin-top: 0; }
+.url-field, .overpass-field { margin-top: 0; }
+
+details.filter-details { margin-top: 10px; }
+details.filter-details summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+details.filter-details summary::before { content: "▶"; font-size: 10px; transition: transform .15s; }
+details.filter-details[open] summary::before { transform: rotate(90deg); }
+.filter-body { padding-top: 10px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background .15s, transform .1s;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary   { background: #1e40af; color: white; }
+.btn-primary:hover   { background: #1d3a9a; }
+.btn-secondary { background: #e2e8f0; color: #334155; }
+.btn-secondary:hover { background: #cbd5e1; }
+.btn-success   { background: #15803d; color: white; }
+.btn-success:hover   { background: #166534; }
+.btn-add-service {
+  width: 100%;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1.5px dashed #93c5fd;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background .15s;
+}
+.btn-add-service:hover { background: #dbeafe; }
+
+.download-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* YAML preview */
+#yaml-preview {
+  margin-top: 16px;
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 16px;
+  border-radius: 8px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-x: auto;
+  white-space: pre;
+  display: none;
+}
+
+.note {
+  background: #eff6ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #1e40af;
+  line-height: 1.5;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1e293b;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all .25s;
+  z-index: 999;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🗺 Ciudad de los 15 Minutos</h1>
+    <p>Configura el análisis para cualquier ciudad y descarga el fichero de configuración</p>
+  </div>
+  <a href="index.html">← Ver mapa de Valencia</a>
+</header>
+
+<main>
+
+  <!-- SECCIÓN 1: CIUDAD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step">1</div>
+      <h2>Ciudad</h2>
+    </div>
+    <div class="card-body">
+
+      <div class="field">
+        <label>Buscar ciudad</label>
+        <div class="autocomplete-wrap">
+          <input id="city-search" type="text" placeholder="Escribe el nombre de una ciudad…" autocomplete="off">
+          <div id="suggestions" class="suggestions"></div>
+        </div>
+        <small>Las coordenadas, bbox y zoom se rellenan automáticamente al seleccionar</small>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Latitud</label>
+          <input id="city-lat" type="number" step="0.0001" value="39.4699">
+        </div>
+        <div class="field">
+          <label>Longitud</label>
+          <input id="city-lon" type="number" step="0.0001" value="-0.3763">
+        </div>
+        <div class="field field-xs">
+          <label>Zoom</label>
+          <input id="city-zoom" type="number" min="8" max="16" value="12">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Bounding Box (S,W,N,E)</label>
+        <input id="city-bbox" type="text" value="39.38,-0.45,39.55,-0.29">
+        <small>Formato Sur,Oeste,Norte,Este — se usa como ámbito de las consultas a Overpass (OpenStreetMap)</small>
+      </div>
+
+      <hr>
+
+      <div class="field">
+        <label>URL GeoJSON — Áreas de análisis</label>
+        <input id="areas-url" type="url" value="https://geoportal.valencia.es/server/rest/services/OPENDATA/UrbanismoEInfraestructuras/MapServer/210/query?where=1=1&outFields=*&f=geojson">
+        <small>Secciones censales u otra división territorial en formato GeoJSON. La URL de Valencia se usa como ejemplo.</small>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Campo identificador de área</label>
+          <input id="areas-id-field" type="text" value="coddistsecc" placeholder="nombre del campo ID en el GeoJSON">
+        </div>
+        <div class="field field-sm">
+          <label>Radio de accesibilidad (m)</label>
+          <input id="distance-m" type="number" min="100" max="5000" value="1000">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECCIÓN 2: SERVICIOS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step">2</div>
+      <h2>Servicios a analizar</h2>
+    </div>
+    <div class="card-body">
+      <p style="margin-bottom:14px;color:#475569;font-size:13px">
+        Cada servicio computa, para cada área, si hay algún elemento accesible dentro del radio definido.
+        El score final de cada área es la suma de servicios accesibles.
+      </p>
+      <div id="services-container"></div>
+      <button class="btn-add-service" id="btn-add-service">＋ Añadir servicio</button>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 3: DESCARGAR -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step">3</div>
+      <h2>Descargar configuración</h2>
+    </div>
+    <div class="card-body">
+      <div class="note" style="margin-bottom:16px">
+        Descarga el fichero <strong>config.yaml</strong>, sustitúyelo en la raíz del proyecto y ejecuta:<br>
+        <code style="font-size:12px">python src/download_data.py</code> y luego
+        <code style="font-size:12px">python src/main.py</code>
+      </div>
+      <div class="download-row">
+        <button class="btn btn-secondary" id="btn-preview">👁 Ver YAML</button>
+        <button class="btn btn-success" id="btn-download">⬇ Descargar config.yaml</button>
+      </div>
+      <pre id="yaml-preview"></pre>
+    </div>
+  </div>
+
+</main>
+
+<!-- Template de tarjeta de servicio -->
+<template id="service-tpl">
+  <div class="service-card">
+    <div class="service-card-header">
+      <input type="text" class="service-emoji-input" data-f="emoji" maxlength="2" placeholder="🏥">
+      <input type="text" class="service-label-input" data-f="label" placeholder="Nombre del servicio">
+      <button class="btn-remove" title="Eliminar servicio">✕</button>
+    </div>
+    <div class="service-card-body">
+      <div class="row" style="margin-bottom:12px">
+        <div class="field field-sm" style="margin:0">
+          <label>Tipo de fuente</label>
+          <select data-f="type">
+            <option value="url">URL directa</option>
+            <option value="overpass">Overpass (OSM)</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Campo de nombre</label>
+          <input type="text" data-f="name_field" placeholder="name">
+        </div>
+      </div>
+
+      <div class="url-field">
+        <div class="field" style="margin:0">
+          <label>URL del GeoJSON</label>
+          <input type="url" data-f="url" placeholder="https://…">
+        </div>
+      </div>
+
+      <div class="overpass-field" style="display:none">
+        <div class="field" style="margin:0">
+          <label>Consulta Overpass</label>
+          <textarea data-f="overpass_query" rows="2" placeholder='(nwr["amenity"="library"]({bbox});); out center;'></textarea>
+          <small>Usa <code>{bbox}</code> como placeholder del bounding box de la ciudad</small>
+        </div>
+      </div>
+
+      <details class="filter-details">
+        <summary>Filtro de campo (opcional)</summary>
+        <div class="filter-body">
+          <div class="row">
+            <div class="field" style="margin:0">
+              <label>Campo</label>
+              <input type="text" data-f="filter_field" placeholder="ej: dgenerica">
+            </div>
+            <div class="field" style="margin:0">
+              <label>Contiene (sin distinción mayúsculas)</label>
+              <input type="text" data-f="filter_contains" placeholder="ej: PRIMÀR">
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+</template>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ─── Defaults (Valencia) ────────────────────────────────────────────────────
+const DEFAULTS = {
+  services: [
+    { id:"salud",        label:"Centros de Salud",   emoji:"🏥", type:"url",
+      url:"https://terramapas.icv.gva.es/15_SistemaValencianoSalud?request=GetFeature&service=WFS&version=2.0.0&typename=CentrosSanitarios.CentrosSalud&outputformat=geojson",
+      name_field:"cen_desclar" },
+    { id:"primaria",     label:"Ed. Primaria",        emoji:"🏫", type:"url",
+      url:"https://opendata.vlci.valencia.es/dataset/11436f0c-082b-4e5b-9659-005f5b528bde/resource/938e34b7-bb7d-4b0c-8176-3602d47ebd6a/download/centros-educativos-en-valencia.geojson",
+      name_field:"dlibre", filter:{ field:"dgenerica", contains:"PRIMÀR" } },
+    { id:"secundaria",   label:"Ed. Secundaria",      emoji:"📚", type:"url",
+      url:"https://opendata.vlci.valencia.es/dataset/11436f0c-082b-4e5b-9659-005f5b528bde/resource/938e34b7-bb7d-4b0c-8176-3602d47ebd6a/download/centros-educativos-en-valencia.geojson",
+      name_field:"dlibre", filter:{ field:"dgenerica", contains:"SECUNDÀR" } },
+    { id:"transporte",   label:"Transporte Público",  emoji:"🚌", type:"url",
+      url:"https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/221/query?where=1=1&outFields=*&f=geojson",
+      name_field:"nombre" },
+    { id:"supermercados",label:"Supermercados",        emoji:"🛒", type:"overpass",
+      overpass_query:'(nwr["shop"="supermarket"]({bbox});); out center;',
+      name_field:"name" },
+    { id:"zonas_verdes", label:"Zonas Verdes",         emoji:"🌳", type:"url",
+      url:"https://geoportal.valencia.es/server/rest/services/OPENDATA/MedioAmbiente/MapServer/8/query?where=1=1&outFields=*&f=geojson",
+      name_field:"nombre" },
+    { id:"cultura",      label:"Cultura",              emoji:"🎭", type:"overpass",
+      overpass_query:'(nwr["amenity"="library"]({bbox});nwr["amenity"="theatre"]({bbox});nwr["amenity"="cinema"]({bbox});nwr["amenity"="arts_centre"]({bbox});); out center;',
+      name_field:"name" },
+  ]
+};
+
+// ─── Nominatim autocomplete ─────────────────────────────────────────────────
+let _debounce;
+const cityInput   = document.getElementById('city-search');
+const suggestions = document.getElementById('suggestions');
+
+cityInput.addEventListener('input', () => {
+  clearTimeout(_debounce);
+  const q = cityInput.value.trim();
+  if (q.length < 3) { suggestions.classList.remove('open'); return; }
+  _debounce = setTimeout(() => fetchCities(q), 500);
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.autocomplete-wrap')) suggestions.classList.remove('open');
+});
+
+async function fetchCities(q) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'es', 'User-Agent': 'quinzemin-tfm/1.0' } });
+    const data = await r.json();
+    renderSuggestions(data);
+  } catch { /* sin conexión o rate-limit: no mostrar nada */ }
+}
+
+function renderSuggestions(results) {
+  suggestions.innerHTML = '';
+  if (!results.length) { suggestions.classList.remove('open'); return; }
+  results.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'suggestion-item';
+    div.textContent = r.display_name;
+    div.addEventListener('click', () => selectCity(r));
+    suggestions.appendChild(div);
+  });
+  suggestions.classList.add('open');
+}
+
+function selectCity(r) {
+  cityInput.value = r.name || r.display_name.split(',')[0].trim();
+  suggestions.classList.remove('open');
+
+  document.getElementById('city-lat').value = parseFloat(r.lat).toFixed(4);
+  document.getElementById('city-lon').value = parseFloat(r.lon).toFixed(4);
+
+  if (r.boundingbox) {
+    // Nominatim: [south, north, west, east] → Overpass: "S,W,N,E"
+    const [s, n, w, e] = r.boundingbox.map(parseFloat);
+    document.getElementById('city-bbox').value =
+      `${s.toFixed(4)},${w.toFixed(4)},${n.toFixed(4)},${e.toFixed(4)}`;
+    const maxSpan = Math.max(Math.abs(n - s), Math.abs(e - w));
+    const zoom = Math.min(14, Math.max(9, Math.round(Math.log2(360 / maxSpan))));
+    document.getElementById('city-zoom').value = zoom;
+  }
+}
+
+// ─── Services CRUD ──────────────────────────────────────────────────────────
+const container = document.getElementById('services-container');
+const tpl = document.getElementById('service-tpl');
+
+function addService(data = {}) {
+  const node = tpl.content.cloneNode(true);
+  const card = node.querySelector('.service-card');
+
+  // Rellenar campos
+  const get = f => card.querySelector(`[data-f="${f}"]`);
+  get('emoji').value        = data.emoji        || '';
+  get('label').value        = data.label        || '';
+  get('name_field').value   = data.name_field   || 'name';
+  get('url').value          = data.url          || '';
+  get('overpass_query').value = data.overpass_query || '';
+  get('filter_field').value    = data.filter?.field    || '';
+  get('filter_contains').value = data.filter?.contains || '';
+
+  const typeSelect = get('type');
+  typeSelect.value = data.type === 'overpass' ? 'overpass' : 'url';
+  applyTypeToggle(card, typeSelect.value);
+  typeSelect.addEventListener('change', () => {
+    applyTypeToggle(card, typeSelect.value);
+    if (typeSelect.value === 'overpass' && !get('name_field').value)
+      get('name_field').value = 'name';
+  });
+
+  // Abrir filtro si tiene datos
+  if (data.filter?.field) card.querySelector('details.filter-details').open = true;
+
+  // Botón eliminar
+  card.querySelector('.btn-remove').addEventListener('click', () => card.remove());
+
+  container.appendChild(card);
+}
+
+function applyTypeToggle(card, type) {
+  card.querySelector('.url-field').style.display     = type === 'url'      ? '' : 'none';
+  card.querySelector('.overpass-field').style.display = type === 'overpass' ? '' : 'none';
+  const filterDetails = card.querySelector('.filter-details');
+  filterDetails.style.display = type === 'url' ? '' : 'none';
+}
+
+document.getElementById('btn-add-service').addEventListener('click', () => addService());
+
+// Cargar defaults
+DEFAULTS.services.forEach(s => addService(s));
+
+// ─── Generar config ─────────────────────────────────────────────────────────
+function collectConfig() {
+  const services = Array.from(container.querySelectorAll('.service-card')).map(card => {
+    const get = f => card.querySelector(`[data-f="${f}"]`).value.trim();
+    const type = get('type');
+    const label = get('label');
+    const id = label.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')   // quita acentos
+      .replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+    const svc = { id, label, emoji: get('emoji') };
+    if (type === 'overpass') {
+      svc.type = 'overpass';
+      svc.overpass_query = get('overpass_query');
+    } else {
+      svc.url = get('url');
+    }
+    svc.name_field = get('name_field') || 'name';
+
+    const ff = get('filter_field'), fc = get('filter_contains');
+    if (ff && fc) svc.filter = { field: ff, contains: fc };
+
+    return svc;
+  });
+
+  return {
+    city: {
+      name:   cityInput.value.trim() || 'Ciudad',
+      center: [
+        parseFloat(document.getElementById('city-lat').value),
+        parseFloat(document.getElementById('city-lon').value)
+      ],
+      zoom:   parseInt(document.getElementById('city-zoom').value, 10),
+      bbox:   document.getElementById('city-bbox').value.trim(),
+      areas: {
+        url:      document.getElementById('areas-url').value.trim(),
+        id_field: document.getElementById('areas-id-field').value.trim()
+      }
+    },
+    analysis: { distance_m: parseInt(document.getElementById('distance-m').value, 10) },
+    map: { emoji_min_zoom: 14 },
+    services
+  };
+}
+
+// ─── Preview ────────────────────────────────────────────────────────────────
+const previewEl = document.getElementById('yaml-preview');
+
+document.getElementById('btn-preview').addEventListener('click', () => {
+  const yaml = jsyaml.dump(collectConfig(), { lineWidth: 120, sortKeys: false });
+  previewEl.textContent = yaml;
+  previewEl.style.display = previewEl.style.display === 'none' ? 'block' : 'none';
+  // reset inicialmente
+  if (previewEl.style.display === 'block') previewEl.style.display = 'block';
+});
+
+// ─── Descarga ────────────────────────────────────────────────────────────────
+document.getElementById('btn-download').addEventListener('click', () => {
+  const yaml = jsyaml.dump(collectConfig(), { lineWidth: 120, sortKeys: false });
+  const blob = new Blob([yaml], { type: 'text/yaml;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'config.yaml';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('✓ config.yaml descargado');
+});
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
