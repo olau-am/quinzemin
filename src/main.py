@@ -227,6 +227,13 @@ def main() -> None:
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, "index.html")
     mapa.get_root().html.add_child(Element(_legend_html(color_cache, n_services, dist_m, services)))
+    mapa.get_root().html.add_child(Element(
+        '<a href="configurar.html" style="position:fixed;top:12px;right:12px;z-index:1000;'
+        'background:white;border:1px solid #aaa;border-radius:6px;padding:7px 12px;'
+        'font-size:12px;font-family:sans-serif;text-decoration:none;color:#1e40af;'
+        'box-shadow:2px 2px 6px rgba(0,0,0,.2);font-weight:600">'
+        '⚙ Generador de configuración</a>'
+    ))
 
     mapa.save(output_file)
     print(f"\nMapa guardado en {output_file}")

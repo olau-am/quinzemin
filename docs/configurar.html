@@ -137,7 +137,7 @@ hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   margin-bottom: 12px;
-  overflow: hidden;
+  /* sin overflow:hidden para que los tooltips no queden recortados */
 }
 .service-card-header {
   display: flex;
@@ -146,6 +146,7 @@ hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
   padding: 10px 14px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
   cursor: pointer;
   user-select: none;
 }
@@ -261,6 +262,61 @@ details.filter-details[open] summary::before { transform: rotate(90deg); }
   line-height: 1.5;
 }
 
+/* Info tooltip */
+.info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: normal;
+  cursor: help;
+  position: relative;
+  margin-left: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.info::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 9px 13px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  white-space: normal;
+  width: 270px;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s;
+  z-index: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+}
+.info::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1e293b;
+  opacity: 0;
+  transition: opacity .18s;
+  z-index: 500;
+}
+.info:hover::after,
+.info:hover::before { opacity: 1; }
+
 /* Toast */
 .toast {
   position: fixed;
@@ -340,7 +396,7 @@ details.filter-details[open] summary::before { transform: rotate(90deg); }
 
       <div class="row">
         <div class="field">
-          <label>Campo identificador de área</label>
+          <label>Campo identificador de área <i class="info" data-tip="Nombre del campo en el GeoJSON de áreas que identifica de forma única cada sección (p.ej. 'coddistsecc'). Este valor aparece como etiqueta en el tooltip del mapa cuando el usuario pasa el ratón por encima de un área.">i</i></label>
           <input id="areas-id-field" type="text" value="coddistsecc" placeholder="nombre del campo ID en el GeoJSON">
         </div>
         <div class="field field-sm">
@@ -408,7 +464,7 @@ details.filter-details[open] summary::before { transform: rotate(90deg); }
           </select>
         </div>
         <div class="field" style="margin:0">
-          <label>Campo de nombre</label>
+          <label>Campo de nombre <i class="info" data-tip="Nombre del campo en el GeoJSON del servicio que contiene el nombre de cada instalación (p.ej. el nombre del centro de salud o del colegio). El mapa lo muestra como 'más cercano' en el tooltip de cada área.">i</i></label>
           <input type="text" data-f="name_field" placeholder="name">
         </div>
       </div>
@@ -429,7 +485,7 @@ details.filter-details[open] summary::before { transform: rotate(90deg); }
       </div>
 
       <details class="filter-details">
-        <summary>Filtro de campo (opcional)</summary>
+        <summary>Filtro de campo (opcional) <i class="info" data-tip="Cuando un GeoJSON mezcla varios tipos de elementos, el filtro selecciona solo los que interesan. Especifica el campo a comprobar y la subcadena que debe contener. Ejemplo: para extraer solo colegios de primaria del fichero de centros educativos, filtra el campo 'dgenerica' por 'PRIMÀR'.">i</i></summary>
         <div class="filter-body">
           <div class="row">
             <div class="field" style="margin:0">
