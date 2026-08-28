@@ -13,7 +13,7 @@ analysis:
   # Modo de cálculo de accesibilidad:
   #   "distance" → radio euclidiano simple (por defecto, sin GTFS)
   #   "transit"  → isócrona por transporte público (requiere gtfs_sources)
-  mode: distance
+  mode: transit
   distance_m: 1000         # radio en metros (modo distance)
   time_minutes: 15         # presupuesto total de viaje en minutos (modo transit)
   walking_speed_mpm: 80    # metros por minuto a pie (~4.8 km/h)

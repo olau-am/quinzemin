@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import config
 
 
-def _legend_html(color_cache: dict, n_services: int, threshold_m: int, services: list) -> str:
+def _legend_html(color_cache: dict, n_services: int, threshold_label: str, services: list) -> str:
     score_rows = ""
     for score in range(n_services + 1):
         color = color_cache[score]
@@ -47,7 +47,7 @@ def _legend_html(color_cache: dict, n_services: int, threshold_m: int, services:
         '<div style="position:fixed;bottom:30px;right:10px;z-index:1000;background:white;'
         'padding:10px 14px;border-radius:6px;border:1px solid #aaa;font-size:13px;'
         'font-family:sans-serif;box-shadow:2px 2px 6px rgba(0,0,0,.3);line-height:1.4">'
-        f'<b>Servicios a &lt;{threshold_m} m</b><br/><br/>'
+        f'<b>Servicios {threshold_label}</b><br/><br/>'
         f'{score_rows}'
         f'{emoji_section}'
         '</div>'
@@ -75,7 +75,14 @@ def main() -> None:
     cfg      = config.load()
     city     = cfg["city"]
     services = cfg["services"]
-    dist_m   = cfg["analysis"]["distance_m"]
+    analysis   = cfg.get("analysis", {})
+    dist_m     = analysis.get("distance_m", 1000)
+    mode       = analysis.get("mode", "distance")
+    transit    = mode == "transit"
+    time_min   = analysis.get("time_minutes", 15)
+    budget_s   = time_min * 60
+    walk_mps   = analysis.get("walking_speed_mpm", 80) / 60
+    max_walk_m = analysis.get("max_walk_to_stop_m", 500)
 
     lat, lon = city["center"]
     mapa = folium.Map(location=[lat, lon], zoom_start=city["zoom"])
@@ -92,6 +99,27 @@ def main() -> None:
     areas = areas.to_crs(utm)
     centroids = areas.geometry.centroid
     areas["score"] = 0
+
+    # --- Cargar grafo GTFS si mode=transit ---
+    graph     = None
+    reachable = None
+    if transit:
+        from gtfs import TransitGraph
+        sources = [
+            {"id": s["id"], "label": s.get("label", s["id"]),
+             "path": f"data/gtfs_{s['id']}.zip"}
+            for s in analysis.get("gtfs_sources", [])
+            if os.path.exists(f"data/gtfs_{s['id']}.zip")
+        ]
+        if sources:
+            graph = TransitGraph.load(sources, utm)
+            print(f"Calculando alcance por transporte público ({len(areas)} centroides)...")
+            reachable = {idx: graph.reachable_from(c, budget_s, walk_mps, max_walk_m)
+                         for idx, c in centroids.items()}
+            print("  Listo.")
+        else:
+            print("⚠ No hay datos GTFS disponibles — usando modo distancia")
+            transit = False
 
     id_field        = city["areas"]["id_field"]
     n_services      = len(services)
@@ -123,26 +151,46 @@ def main() -> None:
                 )
                 gdf = gdf[mask].reset_index(drop=True)
 
-            results          = centroids.apply(lambda c, g=gdf, nc=name_col: _nearest(c, g, nc))
-            areas[dist_col]  = results.apply(lambda r: r[0])
-            areas[nombre_col]= results.apply(lambda r: r[1])
-            areas[ok_col]    = areas[dist_col] <= threshold
-            areas["score"]  += areas[ok_col].astype(int)
-
-            n = int(areas[ok_col].sum())
-            print(f"{label}: {n}/{len(areas)} áreas con acceso <{threshold}m ({len(gdf)} elementos)")
+            if transit:
+                dists, names = [], []
+                for idx in areas.index:
+                    t, name = graph.service_min_time(
+                        reachable[idx], gdf, name_col, walk_mps, budget_s, max_walk_m
+                    )
+                    dists.append(round(t / 60) if t is not None else 9999)
+                    names.append(name)
+                areas[dist_col]  = dists
+                areas[nombre_col]= names
+                areas[ok_col]    = areas[dist_col] <= time_min
+                n = int(areas[ok_col].sum())
+                print(f"{label}: {n}/{len(areas)} áreas con acceso <{time_min}min")
+            else:
+                results          = centroids.apply(lambda c, g=gdf, nc=name_col: _nearest(c, g, nc))
+                areas[dist_col]  = results.apply(lambda r: r[0])
+                areas[nombre_col]= results.apply(lambda r: r[1])
+                areas[ok_col]    = areas[dist_col] <= threshold
+                n = int(areas[ok_col].sum())
+                print(f"{label}: {n}/{len(areas)} áreas con acceso <{threshold}m ({len(gdf)} elementos)")
+            areas["score"] += areas[ok_col].astype(int)
         else:
             areas[dist_col]  = None
             areas[nombre_col]= "—"
             areas[ok_col]    = False
             print(f"Archivo no encontrado: {path}")
 
-        tooltip_fields  += [ok_col, nombre_col, dist_col]
-        tooltip_aliases += [
-            f"{label} <{threshold}m:",
-            "Más cercano:",
-            "Distancia (m):",
-        ]
+        tooltip_fields += [ok_col, nombre_col, dist_col]
+        if transit:
+            tooltip_aliases += [
+                f"{label} <{time_min}min:",
+                "Más cercano:",
+                "Tiempo (min):",
+            ]
+        else:
+            tooltip_aliases += [
+                f"{label} <{threshold}m:",
+                "Más cercano:",
+                "Distancia (m):",
+            ]
 
     # --- Renderizar mapa ---
     areas_wgs84       = areas.to_crs(epsg=4326)
@@ -226,7 +274,12 @@ def main() -> None:
     output_dir  = "docs"
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, "index.html")
-    mapa.get_root().html.add_child(Element(_legend_html(color_cache, n_services, dist_m, services)))
+    threshold_label = (
+        f"en &lt;{time_min} min · transporte público"
+        if transit else
+        f"a &lt;{dist_m} m"
+    )
+    mapa.get_root().html.add_child(Element(_legend_html(color_cache, n_services, threshold_label, services)))
     mapa.get_root().html.add_child(Element(
         '<a href="configurar.html" style="position:fixed;top:12px;right:12px;z-index:1000;'
         'background:white;border:1px solid #aaa;border-radius:6px;padding:7px 12px;'
