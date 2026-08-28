@@ -39,7 +39,7 @@ def main() -> None:
 
     budget_s   = analysis.get("time_minutes", 15) * 60
     walk_mps   = analysis.get("walking_speed_mpm", 80) / 60
-    max_walk_m = analysis.get("max_walk_to_stop_m", 500)
+    max_walk_m = analysis.get("max_walk_to_stop_m", 400)
 
     areas_path = "data/areas.geojson"
     if not os.path.exists(areas_path):

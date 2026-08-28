@@ -37,7 +37,7 @@ def main() -> None:
     analysis = cfg.get("analysis", {})
     services = cfg.get("services", [])
 
-    radius_m = analysis.get("distance_m", 1000)
+    radius_m = analysis.get("distance_m", 800)
 
     areas_path = "data/areas.geojson"
     if not os.path.exists(areas_path):
