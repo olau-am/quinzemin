@@ -10,7 +10,33 @@ city:
     id_field: "coddistsecc"   # campo que identifica cada área en el tooltip
 
 analysis:
-  distance_m: 1000   # radio de accesibilidad en metros
+  # Modo de cálculo de accesibilidad:
+  #   "distance" → radio euclidiano simple (por defecto, sin GTFS)
+  #   "transit"  → isócrona por transporte público (requiere gtfs_sources)
+  mode: distance
+  distance_m: 1000         # radio en metros (modo distance)
+  time_minutes: 15         # presupuesto total de viaje en minutos (modo transit)
+  walking_speed_mpm: 80    # metros por minuto a pie (~4.8 km/h)
+  max_walk_to_stop_m: 500  # máx. distancia a pie hasta/desde una parada
+  # Fuentes GTFS (se pueden combinar varias redes).
+  # Datos estáticos: suficientes para análisis de accesibilidad típica.
+  # GTFS-RT (tiempo real) no aplica — solo añade posiciones/retrasos instantáneos.
+  # Valenbisi usa GBFS (bicicletas), formato distinto; no entra en este grafo.
+  gtfs_sources:
+    - id: metro
+      label: "Metrovalencia (FGV)"
+      # Feed oficial de FGV — fuente más cercana a la Generalitat Valenciana
+      # Referencia NAP: https://nap.transportes.gob.es/Files/Detail/967
+      url: "http://www.metrovalencia.es/google_transit_feed/google_transit.zip"
+      # El servidor redirige a HTTPS con certificado FNMT (no incluido en Python por defecto)
+      verify_ssl: false
+    - id: emt
+      label: "EMT Valencia (autobuses urbanos)"
+      # Portal Datos Abiertos Ajuntament de València (CC BY 4.0)
+      # Catálogo: https://datos.gob.es/es/catalogo/l01462508-google-transit-lineas-paradas-horarios-de-autobuses-de-la-emt-de-valencia
+      # Referencia NAP: https://nap.transportes.gob.es/Files/Detail/965
+      # Nota: el nombre del fichero lleva la fecha de publicación y cambia en cada actualización
+      url: "https://opendata.vlci.valencia.es/dataset/ab058cf8-ad3e-4d9c-ac89-0c6367ecf351/resource/c81b69e6-c082-44dc-acc6-66fc417b4e66/download/google_transit2026-05-31.zip"
 
 map:
   emoji_min_zoom: 14  # zoom mínimo a partir del cual aparecen los emojis

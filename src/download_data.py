@@ -1,5 +1,6 @@
 import os
 import json
+import urllib3
 import requests
 import config
 
@@ -28,8 +29,10 @@ def _osm_to_geojson(osm_data: dict) -> dict:
     return {"type": "FeatureCollection", "features": features}
 
 
-def _download_url(url: str, destination: str) -> None:
-    response = requests.get(url, headers=_HEADERS, stream=True, timeout=60)
+def _download_url(url: str, destination: str, verify: bool = True) -> None:
+    if not verify:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    response = requests.get(url, headers=_HEADERS, stream=True, timeout=60, verify=verify)
     response.raise_for_status()
     with open(destination, "wb") as f:
         f.write(response.content)
@@ -98,6 +101,23 @@ def descargar_todos_los_archivos(output_dir: str = "data") -> None:
 
         except Exception as e:
             print(f"✗ Error descargando {svc['label']}: {e}")
+
+    # GTFS — se descarga siempre que haya fuentes configuradas,
+    # independientemente de analysis.mode (map_gtfs.py funciona en cualquier modo)
+    for src in cfg.get("analysis", {}).get("gtfs_sources", []):
+        src_id  = src.get("id", "gtfs")
+        src_url = src.get("url", "").strip()
+        label   = src.get("label", src_id)
+        verify  = src.get("verify_ssl", True)   # false para sitios con cert FNMT/GVA
+        dest    = os.path.join(output_dir, f"gtfs_{src_id}.zip")
+        if not src_url:
+            print(f"⚠ Sin URL para GTFS {label} — omitida")
+            continue
+        try:
+            _download_url(src_url, dest, verify=verify)
+            print(f"✓ GTFS {label}: {dest}")
+        except Exception as e:
+            print(f"✗ Error descargando GTFS {label}: {e}")
 
 
 if __name__ == "__main__":
