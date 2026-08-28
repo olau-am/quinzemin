@@ -530,6 +530,9 @@ const DEFAULTS = {
     { id:"cultura",      label:"Cultura",              emoji:"🎭", type:"overpass",
       overpass_query:'(nwr["amenity"="library"]({bbox});nwr["amenity"="theatre"]({bbox});nwr["amenity"="cinema"]({bbox});nwr["amenity"="arts_centre"]({bbox});); out center;',
       name_field:"name" },
+    { id:"farmacias",    label:"Farmacias",            emoji:"💊", type:"overpass",
+      overpass_query:'(nwr["amenity"="pharmacy"]({bbox});); out center;',
+      name_field:"name" },
   ]
 };
 

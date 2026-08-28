@@ -209,6 +209,7 @@ services:
 | `supermercados` | Supermercados | OpenStreetMap/Overpass | overpass |
 | `zonas_verdes` | Parques y jardines | Geoportal Valencia | url |
 | `cultura` | Bibliotecas, teatros, cines, centros culturales | OpenStreetMap/Overpass | overpass |
+| `farmacias` | Farmacias | OpenStreetMap/Overpass | overpass |
 
 ---
 
