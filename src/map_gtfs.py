@@ -113,22 +113,10 @@ def main() -> None:
     lat, lon = city["center"]
     mapa = folium.Map(location=[lat, lon], zoom_start=city["zoom"])
 
-    # Capa 1: contornos de secciones censales
     areas_wgs84 = areas.to_crs(epsg=4326)
-    folium.GeoJson(
-        areas_wgs84,
-        style_function=lambda f: {
-            "fillColor": "none",
-            "color":     "#888",
-            "weight":    0.8,
-            "fillOpacity": 0,
-        },
-        name="Secciones censales",
-        show=True,
-    ).add_to(mapa)
 
-    # Capa 2: isócronas (polígonos semitransparentes — se acumulan visualmente)
-    folium.GeoJson(
+    # Capa 1: isócronas (añadida primero → debajo en z-order)
+    iso_lyr = folium.GeoJson(
         iso_gdf,
         style_function=lambda f: {
             "fillColor":   "#2563eb",
@@ -136,13 +124,32 @@ def main() -> None:
             "weight":      0.4,
             "fillOpacity": 0.12,
         },
+        name=f"Isócronas {budget_min} min (transporte público)",
+        show=True,
+    )
+    iso_lyr.add_to(mapa)
+
+    # Capa 2: contornos censales (añadida después → encima, captura eventos de ratón)
+    areas_lyr = folium.GeoJson(
+        areas_wgs84,
+        style_function=lambda f: {
+            "fillColor":   "#ffffff",
+            "color":       "#888",
+            "weight":      0.8,
+            "fillOpacity": 0.001,
+        },
+        highlight_function=lambda f: {
+            "color":  "#444",
+            "weight": 1.8,
+        },
         tooltip=folium.GeoJsonTooltip(
             fields=[city["areas"]["id_field"]],
             aliases=["Área:"],
         ),
         name=f"Isócronas {budget_min} min (transporte público)",
         show=True,
-    ).add_to(mapa)
+    )
+    areas_lyr.add_to(mapa)
 
     # Capa 3: paradas coloreadas por cobertura (desactivada por defecto)
     stops_fg = folium.FeatureGroup(name="Paradas GTFS (cobertura)", show=False)
@@ -186,6 +193,33 @@ def main() -> None:
         '</div>'
     )
     mapa.get_root().html.add_child(Element(legend_html))
+
+    # Hover cross-layer: área censal → resalta su isócrona en naranja
+    id_field  = city["areas"]["id_field"]
+    areas_var = areas_lyr.get_name()
+    iso_var   = iso_lyr.get_name()
+    mapa.get_root().html.add_child(Element(
+        "<script>window.addEventListener('load',function(){"
+        f"var _id='{id_field}',_al={areas_var},_zl={iso_var},_zb={{}};"
+        "_zl.eachLayer(function(l){"
+        "var k=l.feature&&l.feature.properties&&l.feature.properties[_id];"
+        "if(k!=null)_zb[k]=l;"
+        "});"
+        "_al.eachLayer(function(l){"
+        "var k=l.feature&&l.feature.properties&&l.feature.properties[_id];"
+        "l.on('mouseover',function(){"
+        "if(_zb[k]){"
+        "_zb[k].setStyle({fillColor:'#f97316',color:'#ea580c',fillOpacity:0.55,weight:1.5});"
+        "_zb[k].bringToFront();"
+        "_al.bringToFront();"
+        "}"
+        "});"
+        "l.on('mouseout',function(){"
+        "if(_zb[k])_zb[k].setStyle({fillColor:'#2563eb',color:'#1d4ed8',fillOpacity:0.12,weight:0.4});"
+        "});"
+        "});"
+        "});</script>"
+    ))
 
     output = os.path.join("docs", "mapa_gtfs.html")
     os.makedirs("docs", exist_ok=True)
