@@ -59,6 +59,35 @@ def _download_overpass(query: str, destination: str) -> None:
     raise RuntimeError(f"Todos los mirrors fallaron. Último error: {last_error}")
 
 
+def _fetch_source_features(src: dict, bbox: str) -> list:
+    """Descarga una fuente individual y devuelve su lista de features GeoJSON."""
+    src_type = src.get("type", "url")
+    if src_type == "overpass":
+        query = src["overpass_query"].replace("{bbox}", bbox)
+        last_error = None
+        for mirror in _OVERPASS_MIRRORS:
+            try:
+                response = requests.get(
+                    mirror,
+                    params={"data": f"[out:json][timeout:60];{query}"},
+                    headers=_HEADERS,
+                    timeout=90,
+                )
+                response.raise_for_status()
+                return _osm_to_geojson(response.json())["features"]
+            except Exception as e:
+                print(f"  Mirror {mirror} falló: {e}")
+                last_error = e
+        raise RuntimeError(f"Todos los mirrors fallaron. Último error: {last_error}")
+    else:
+        verify = src.get("verify_ssl", True)
+        if not verify:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        response = requests.get(src["url"], headers=_HEADERS, stream=True, timeout=60, verify=verify)
+        response.raise_for_status()
+        return response.json().get("features", [])
+
+
 def descargar_todos_los_archivos(output_dir: str = "data") -> None:
     cfg = config.load()
     bbox = cfg["city"]["bbox"]
@@ -82,7 +111,33 @@ def descargar_todos_los_archivos(output_dir: str = "data") -> None:
         dest     = os.path.join(output_dir, f"{svc_id}.geojson")
 
         try:
-            if svc_type == "overpass":
+            if "sources" in svc:
+                # Múltiples fuentes: descargar cada una y combinar features
+                service_name_field = svc.get("name_field")
+                all_features = []
+                source_labels = []
+                for src in svc["sources"]:
+                    src_label = src.get("label", src.get("type", "?"))
+                    try:
+                        features = _fetch_source_features(src, bbox)
+                        # Normalizar nombre: si la fuente usa un campo distinto al del servicio,
+                        # copiarlo para que main.py encuentre siempre el mismo campo.
+                        src_name_field = src.get("name_field")
+                        if src_name_field and service_name_field and src_name_field != service_name_field:
+                            for f in features:
+                                props = f.get("properties") or {}
+                                if src_name_field in props and service_name_field not in props:
+                                    props[service_name_field] = props[src_name_field]
+                        all_features.extend(features)
+                        source_labels.append(f"{src_label} ({len(features)})")
+                    except Exception as e:
+                        print(f"  ✗ Fuente '{src_label}': {e}")
+                geojson = {"type": "FeatureCollection", "features": all_features}
+                with open(dest, "w", encoding="utf-8") as f:
+                    json.dump(geojson, f, ensure_ascii=False)
+                print(f"✓ {svc['label']}: {dest} ({len(all_features)} elementos — {', '.join(source_labels)})")
+
+            elif svc_type == "overpass":
                 query = svc["overpass_query"].replace("{bbox}", bbox)
                 n = _download_overpass(query, dest)
                 print(f"✓ {svc['label']}: {dest} ({n} elementos)")

@@ -97,7 +97,7 @@ def main() -> None:
     # Mapa Folium
     # ------------------------------------------------------------------
     lat, lon = city["center"]
-    mapa = folium.Map(location=[lat, lon], zoom_start=city["zoom"])
+    mapa = folium.Map(location=[lat, lon], zoom_start=city["zoom"], attr=config.build_attr(cfg))
 
     areas_wgs84 = areas.to_crs(epsg=4326)
 

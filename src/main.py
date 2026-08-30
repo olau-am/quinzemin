@@ -85,7 +85,7 @@ def main() -> None:
     max_walk_m = analysis.get("max_walk_to_stop_m", 500)
 
     lat, lon = city["center"]
-    mapa = folium.Map(location=[lat, lon], zoom_start=city["zoom"])
+    mapa = folium.Map(location=[lat, lon], zoom_start=city["zoom"], attr=config.build_attr(cfg))
 
     # --- Cargar áreas de análisis ---
     areas_path = "data/areas.geojson"
