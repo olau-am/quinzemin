@@ -10,3 +10,5 @@ data/
 notes/
 *.sqlite3
 .idea/
+quinzemin.code-workspace
+cache/

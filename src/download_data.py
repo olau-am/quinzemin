@@ -88,6 +88,29 @@ def _fetch_source_features(src: dict, bbox: str) -> list:
         return response.json().get("features", [])
 
 
+def _download_walk_graph(cfg: dict, areas_path: str, dest: str) -> None:
+    """Descarga la red peatonal de OSM (OSMnx) sobre el término + margen y la guarda en GraphML."""
+    import geopandas as gpd
+    import osmnx as ox
+
+    net_cfg  = cfg.get("analysis", {}).get("network", {})
+    buffer_m = net_cfg.get("buffer_m", 1000)
+    cons_m   = net_cfg.get("consolidate_m", 0)
+
+    areas = gpd.read_file(areas_path)
+    utm   = areas.estimate_utm_crs()
+    poly  = areas.to_crs(utm).union_all().buffer(buffer_m)
+    poly  = gpd.GeoSeries([poly], crs=utm).to_crs(epsg=4326).iloc[0]
+
+    print(f"  Descargando red peatonal OSM (margen {buffer_m} m)...")
+    G = ox.graph_from_polygon(poly, network_type="walk", simplify=True, retain_all=False)
+    if cons_m and cons_m > 0:
+        G = ox.consolidate_intersections(ox.project_graph(G), tolerance=cons_m,
+                                         rebuild_graph=True, dead_ends=True)
+    ox.save_graphml(G, dest)
+    print(f"✓ Red peatonal: {dest} ({G.number_of_nodes()} nodos, {G.number_of_edges()} aristas)")
+
+
 def descargar_todos_los_archivos(output_dir: str = "data") -> None:
     cfg = config.load()
     bbox = cfg["city"]["bbox"]
@@ -173,6 +196,17 @@ def descargar_todos_los_archivos(output_dir: str = "data") -> None:
             print(f"✓ GTFS {label}: {dest}")
         except Exception as e:
             print(f"✗ Error descargando GTFS {label}: {e}")
+
+    # Red peatonal — solo si se usa el modo network (o se fuerza con --network)
+    import sys
+    analysis = cfg.get("analysis", {})
+    if analysis.get("mode") == "network" or "--network" in sys.argv:
+        dest = analysis.get("network", {}).get("graph_path",
+                                                os.path.join(output_dir, "walk_graph.graphml"))
+        try:
+            _download_walk_graph(cfg, areas_dest, dest)
+        except Exception as e:
+            print(f"✗ Error descargando red peatonal: {e}")
 
 
 if __name__ == "__main__":

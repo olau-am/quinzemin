@@ -1,6 +1,9 @@
 import os
 import webbrowser
 
+import numpy as np
+import pandas as pd
+
 import folium
 from branca.element import Element
 import geopandas as gpd
@@ -79,6 +82,8 @@ def main() -> None:
     dist_m     = analysis.get("distance_m", 1000)
     mode       = analysis.get("mode", "distance")
     transit    = mode == "transit"
+    network    = mode == "network"
+    net_cfg    = analysis.get("network", {})
     time_min   = analysis.get("time_minutes", 15)
     budget_s   = time_min * 60
     walk_mps   = analysis.get("walking_speed_mpm", 80) / 60
@@ -121,6 +126,21 @@ def main() -> None:
             print("⚠ No hay datos GTFS disponibles — usando modo distancia")
             transit = False
 
+    # --- Cargar red peatonal si mode=network ---
+    net = None
+    snap_rows = []
+    if network:
+        graph_path = net_cfg.get("graph_path", "data/walk_graph.graphml")
+        if os.path.exists(graph_path):
+            from network import WalkNetwork
+            net = WalkNetwork.load(graph_path, utm)
+            orig_node, orig_snap = net.snap(centroids)
+            areas["snap_m"] = orig_snap.round(1)
+            snap_rows.append(("origen (centroides)", orig_snap))
+        else:
+            print(f"⚠ No existe {graph_path} — ejecuta download_data.py. Usando modo distancia")
+            network = False
+
     id_field        = city["areas"]["id_field"]
     n_services      = len(services)
     tooltip_fields  = [id_field, "score"]
@@ -151,7 +171,32 @@ def main() -> None:
                 )
                 gdf = gdf[mask].reset_index(drop=True)
 
-            if transit:
+            if network:
+                feat, dnode, doff = net.destinations(
+                    gdf, polygon_access=svc.get("access") == "polygon",
+                    access_m=net_cfg.get("park_access_m", 20),
+                    max_snap_m=net_cfg.get("max_snap_m", 500),
+                )
+                snap_rows.append((svc_id, doff))
+                node_dist, node_feat = net.nearest_service(feat, dnode, doff)
+                d     = node_dist[orig_node] + orig_snap
+                fidx  = node_feat[orig_node]
+                names = gdf[name_col].astype(str).to_numpy() if name_col in gdf.columns                         else np.full(len(gdf), "—")
+                areas[dist_col]   = np.where(np.isfinite(d), np.round(d), 99999).astype(int)
+                areas[nombre_col] = [names[i] if i >= 0 else "—" for i in fidx]
+                areas[ok_col]     = areas[dist_col] <= threshold
+                # Índice de rodeo: distancia por la red / distancia en línea recta al mismo servicio
+                euclid = np.array([
+                    gdf.geometry.iloc[i].distance(c) if i >= 0 else np.nan
+                    for i, c in zip(fidx, centroids)
+                ])
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    areas[f"rodeo_{svc_id}"] = np.round(np.where(euclid > 1, d / euclid, np.nan), 2)
+                n = int(areas[ok_col].sum())
+                print(f"{label}: {n}/{len(areas)} áreas con acceso <{threshold}m por la red "
+                      f"({len(gdf) - net.last_dropped} elementos en la red, {net.last_dropped} descartados "
+                      f"por estar a >{net_cfg.get('max_snap_m', 500)} m)")
+            elif transit:
                 dists, names = [], []
                 for idx in areas.index:
                     t, name = graph.service_min_time(
@@ -187,10 +232,29 @@ def main() -> None:
             ]
         else:
             tooltip_aliases += [
-                f"{label} <{threshold}m:",
+                f"{label} <{threshold}m{' (red)' if network else ''}:",
                 "Más cercano:",
                 "Distancia (m):",
             ]
+
+    # --- Diagnóstico de snapping (modo network) ---
+    if network and snap_rows:
+        warn_m = net_cfg.get("snap_warn_m", 150)
+        print("\nDistancias de enganche a la red (m):")
+        print(f"  {'conjunto':<22}{'n':>6}{'p50':>8}{'p90':>8}{'p99':>8}{'max':>8}{'>'+str(warn_m):>7}")
+        report = []
+        for name, arr in snap_rows:
+            arr = np.asarray(arr, dtype=float)
+            if not len(arr):
+                continue
+            p50, p90, p99 = np.percentile(arr, [50, 90, 99])
+            n_warn = int((arr > warn_m).sum())
+            print(f"  {name:<22}{len(arr):>6}{p50:>8.1f}{p90:>8.1f}{p99:>8.1f}{arr.max():>8.1f}{n_warn:>7}")
+            report.append({"conjunto": name, "n": len(arr), "p50": p50, "p90": p90,
+                           "p99": p99, "max": arr.max(), f"n_mayor_{warn_m}m": n_warn})
+        os.makedirs("data", exist_ok=True)
+        pd.DataFrame(report).round(1).to_csv("data/snap_report.csv", index=False)
+        print("  → data/snap_report.csv")
 
     # --- Renderizar mapa ---
     areas_wgs84       = areas.to_crs(epsg=4326)
@@ -277,6 +341,8 @@ def main() -> None:
     threshold_label = (
         f"en &lt;{time_min} min · transporte público"
         if transit else
+        f"a &lt;{dist_m} m por la red peatonal"
+        if network else
         f"a &lt;{dist_m} m"
     )
     mapa.get_root().html.add_child(Element(_legend_html(color_cache, n_services, threshold_label, services)))

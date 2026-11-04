@@ -18,6 +18,15 @@ python src/download_data.py   # descarga también los feeds GTFS
 python src/map_gtfs.py        # genera docs/mapa_gtfs.html
 ```
 
+Para calcular la accesibilidad **por la red peatonal real** (en lugar de en línea recta):
+
+```bash
+# 1. Activa analysis.mode: network en config.yaml (opciones en analysis.network)
+python src/download_data.py --network   # descarga la red peatonal OSM → data/walk_graph.graphml
+python src/main.py                      # distancias por la red + informe data/snap_report.csv
+python src/map_network.py               # isócronas a pie → docs/mapa_red_800m.html
+```
+
 El formulario de configuración para otras ciudades está disponible en `docs/configurar.html`.
 
 ---

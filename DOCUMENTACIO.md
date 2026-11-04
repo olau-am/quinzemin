@@ -61,6 +61,18 @@ Descarrega els datasets oberts necessaris des de portals oficials cap a la carpe
 
 **Llindar de distància:** fixat a 1 km en línia recta com a aproximació estàndard d'un desplaçament a peu d'uns 15 minuts. No es distingeix per mode de transport ni es fa servir distància per xarxa de carrers (network distance), només distància euclidiana ("en línia recta").
 
+### 3.3 Mode `network`: distància per la xarxa de vianants (`src/network.py`)
+
+Amb `analysis.mode: network`, la distància euclidiana se substitueix per la distància a peu sobre la xarxa de vianants d'OpenStreetMap, seguint els cinc passos d'un sistema d'accessibilitat a peu:
+
+1. **Graf**: OSMnx (`network_type="walk"`) sobre el terme municipal + 1 km de marge → `data/walk_graph.graphml` (62.852 nodes, 94.902 arestes).
+2. **Topologia**: simplificació d'OSMnx; sense consolidar interseccions, per a no perdre els passos de vianants.
+3. **Snapping**: centroides i serveis s'enganxen al node més proper (`cKDTree`), i la distància d'enganxament se suma al recorregut. Les zones verdes s'hi poden assolir per qualsevol node interior o situat a menys de 20 m del polígon. La distribució de les distàncies es documenta a `data/snap_report.csv` (centroides: mediana 27 m, p90 65 m).
+4. **Dijkstra multi-origen** (`scipy.sparse.csgraph.dijkstra`, `min_only=True`): tots els serveis d'una categoria són orígens alhora, mitjançant un node virtual per servei amb pes igual a la seua distància d'enganxament. Són 8 càlculs per a tota la ciutat.
+5. **Isòcrones** (`src/map_network.py`): buffer de les arestes assolides, només per a visualitzar.
+
+També es calcula un **índex de rodeig** per secció (distància per xarxa ÷ distància en línia recta) com a aportació pròpia; el concepte i el mètode es poden citar de Boeing. Les dades de Boeing no s'utilitzen com a entrada perquè modelen la xarxa per a cotxes i agreguen els indicadors per àrea urbana.
+
 ## 4. Fonts de dades
 
 Totes les fonts són **dades obertes** (portals governamentals o OpenStreetMap/ODbL). Es va migrar explícitament des d'un origen previ en Google Drive cap a fonts oficials (veure `notes/sources 1.txt`, exclòs del repo).

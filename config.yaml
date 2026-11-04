@@ -28,11 +28,21 @@ analysis:
   # Modo de cálculo de accesibilidad:
   #   "distance" → radio euclidiano simple (por defecto, sin GTFS)
   #   "transit"  → isócrona por transporte público (requiere gtfs_sources)
-  mode: distance
+  #   "network"  → distancia a pie por la red peatonal real de OSM (requiere osmnx, scipy)
+  mode: network
   distance_m: 800         # radio en metros (modo distance)
   time_minutes: 15         # presupuesto total de viaje en minutos (modo transit)
   walking_speed_mpm: 80    # metros por minuto a pie (~4.8 km/h)
   max_walk_to_stop_m: 500  # máx. distancia a pie hasta/desde una parada
+  # Opciones del modo network (red peatonal OSM)
+  network:
+    graph_path: data/walk_graph.graphml
+    buffer_m: 1000          # margen alrededor del término al descargar (evita efecto borde)
+    consolidate_m: 0        # 0 = no consolidar intersecciones (preserva pasos de peatones)
+    snap_warn_m: 150        # avisar si un punto se engancha a la red a más de X m
+    max_snap_m: 500         # descartar servicios a más de X m de la red (fuera del área)
+    park_access_m: 20       # servicios con access: polygon → nodos dentro del polígono + margen
+    isochrone_buffer_m: 25  # buffer de aristas para el polígono de la isócrona (visual)
   # Fuentes GTFS (se pueden combinar varias redes).
   # Datos estáticos: suficientes para análisis de accesibilidad típica.
   # GTFS-RT (tiempo real) no aplica — solo añade posiciones/retrasos instantáneos.
@@ -66,6 +76,7 @@ map:
 # Los nombres de las distintas fuentes se normalizan automáticamente al name_field del servicio.
 #
 # Campos opcionales:
+#   access          → "polygon": en modo network el destino es todo el polígono (parques)
 #   filter.field    → nombre del campo sobre el que filtrar
 #   filter.contains → subcadena que debe contener el campo (búsqueda sin distinción de mayúsculas)
 
@@ -121,6 +132,7 @@ services:
     emoji: "🌳"
     url: "https://geoportal.valencia.es/server/rest/services/OPENDATA/MedioAmbiente/MapServer/8/query?where=1=1&outFields=*&f=geojson"
     name_field: "nombre"
+    access: polygon   # modo network: se llega a cualquier punto del parque, no a su centroide
 
   - id: cultura
     label: "Cultura"

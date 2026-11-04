@@ -15,6 +15,7 @@ El concepto central es que cualquier residente urbano debería poder acceder a p
 El sistema tiene dos modos de análisis:
 
 - **Modo distancia** (`distance`): distancia euclídea en línea recta desde el centroide de cada sección censal hasta el elemento más próximo de cada servicio. Umbral configurable en metros (por defecto 1 000 m).
+- **Modo red peatonal** (`network`): distancia a pie por la red real de OSM (OSMnx + Dijkstra multi-origen de scipy). Ver §4.4.
 - **Modo tránsito** (`transit`): isócrona real por transporte público usando datos GTFS. Umbral configurable en minutos (por defecto 15 min), con tiempo de paseo a pie hasta/desde las paradas.
 
 El prototipo está implementado para **Valencia (España)** con 7 servicios analizados, pero es completamente parametrizable para cualquier ciudad mediante un fichero `config.yaml` o mediante el formulario web `docs/configurar.html`.
@@ -79,6 +80,8 @@ geopandas   — análisis geoespacial (geometrías, proyecciones, distancias)
 folium      — generación de mapas interactivos HTML (wrapper Python de Leaflet.js)
 matplotlib  — paleta de colores (gradiente RdYlGn para el mapa coroplético)
 pyyaml      — lectura de config.yaml
+osmnx       — descarga y modelado de la red peatonal OSM (modo network)
+scipy       — Dijkstra multi-origen (csgraph) y cKDTree para el snapping (modo network)
 requests    — descarga HTTP de datos
 urllib3     — gestión de SSL (incluido con requests)
 ```
@@ -114,7 +117,7 @@ city:
 
 ```yaml
 analysis:
-  mode: distance         # "distance" | "transit"
+  mode: distance         # "distance" | "transit" | "network"
   distance_m: 1000       # umbral en metros (modo distance)
   time_minutes: 15       # presupuesto total de viaje en minutos (modo transit)
   walking_speed_mpm: 80  # velocidad a pie en metros/minuto (~4,8 km/h)
@@ -280,6 +283,22 @@ Script principal. Genera `docs/index.html`.
 8. **Abre el mapa** en el navegador con `webbrowser.open()`.
 
 **Nota sobre el modo transit en `main.py`**: el modo `transit` está diseñado e implementado en `gtfs.py` pero aún no está integrado en el bucle principal de `main.py` (que actualmente solo implementa el modo `distance`). La integración es el próximo paso de desarrollo. El script `map_gtfs.py` ya usa el motor GTFS para la visualización de isócronas.
+
+### 4.4 Modo red peatonal: `src/network.py` y `src/map_network.py`
+
+Sustituye la distancia euclídea por la distancia a pie sobre la red peatonal de OpenStreetMap. Sigue los cinco pasos habituales de un sistema de accesibilidad a pie:
+
+1. **Grafo** (`download_data.py → _download_walk_graph`): `osmnx.graph_from_polygon(network_type="walk")` sobre la unión de las secciones + `buffer_m` (1 km, evita efecto borde). OSMnx 2 excluye las vías con aceras cartografiadas aparte para no duplicarlas. Se guarda en `data/walk_graph.graphml`. València: 62.852 nodos y 94.902 aristas, un único componente conexo.
+2. **Topología**: simplificación de OSMnx (nodos = intersecciones y finales de calle). La consolidación de intersecciones está desactivada por defecto (`consolidate_m: 0`) porque un paso de peatones entre dos nodos próximos es un recorrido real.
+3. **Snapping**: orígenes (centroides) y servicios se enganchan al nodo más cercano con un `cKDTree`; la distancia de enganche se **suma** al recorrido. Para los servicios con `access: polygon` (zonas verdes), los destinos son todos los nodos dentro del polígono + `park_access_m` (20 m), con distancia de enganche 0. Se descartan los servicios a más de `max_snap_m` (500 m) de la red, es decir, fuera del área (p. ej. el WFS de salud devuelve toda la Comunitat). La distribución de distancias de enganche se imprime y se guarda en `data/snap_report.csv`.
+4. **Caminos mínimos — Dijkstra multi-origen**: por cada categoría se añade un nodo virtual por servicio, unido a su nodo de red con peso igual a su distancia de enganche, y se lanza **un único** `scipy.sparse.csgraph.dijkstra(indices=virtuales, min_only=True, return_predecessors=True)`. Devuelve para cada nodo la distancia al servicio más cercano y cuál es (`sources`). Son 8 cálculos para toda la ciudad (~50 s en total, incluida la carga del grafo). Distancia de la sección = `dist[nodo_centroide] + enganche_origen`.
+5. **Isócronas** (`map_network.py`, solo visualización): Dijkstra de un origen con `limit`, aristas completas alcanzadas más los tramos parciales de las aristas frontera (`shapely.ops.substring`), buffer de cada arista (`isochrone_buffer_m`) y unión. Salida en `docs/mapa_red_800m.html`, con el círculo euclídeo opcional para comparar.
+
+Columnas añadidas en `main.py`: `snap_m` (enganche del centroide) y `rodeo_<svc>` = distancia por la red ÷ distancia en línea recta al mismo servicio (índice de rodeo o circuidad por sección; concepto y método según Boeing).
+
+**Comprobaciones (València, 800 m):** ninguna sección obtiene una distancia por la red menor que la euclídea, salvo en zonas verdes, donde la diferencia es como máximo de 19,7 m (< `park_access_m`, por diseño). El índice de rodeo mediano es ≈1,5 (1,17 en zonas verdes). Secciones con acceso: salud 535 → 386, cultura 555 → 485, secundaria 564 → 526; el resto pierde entre 5 y 17.
+
+**Limitación conocida:** en 6 secciones rurales grandes el centroide queda a más de 150 m de la red (máx. 2,7 km, sección 1909, con el centroide en l'Albufera). El centroide no es un buen origen para ellas; una alternativa es usar puntos ponderados por población o una malla regular.
 
 ---
 
